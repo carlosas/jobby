@@ -44,6 +44,23 @@ with st.sidebar:
     else:
         st.caption("No interviews processed yet.")
 
+
+# Validates prompt input
+def validate_prompt(prompt):
+    if not prompt or len(prompt.strip()) == 0:
+        return False
+    return True
+
+# Helper to run analysis
+def run_analysis_logic(transcription, system_prompt):
+    chat_model = ChatOpenAI(model="gpt-4o", temperature=0.5)
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Transcript:\n{transcription}")
+    ]
+    response = chat_model.invoke(messages)
+    return response.content
+
 if st.session_state.selected_interview_id:
     interview = db.get_interview(st.session_state.selected_interview_id)
     if interview:
@@ -69,7 +86,29 @@ if st.session_state.selected_interview_id:
                 delete_dialog(st.session_state.selected_interview_id)
 
         with tab2:
-            st.markdown(interview[3] if interview[3] else "No analysis available.")
+            # Re-analysis UI
+            current_analysis = interview[3] if interview[3] else "No analysis available."
+            # Retrieve saved prompt or use default if none exists (migration case)
+            saved_prompt = interview[4] if len(interview) > 4 and interview[4] else DEFAULT_ANALYSIS_PROMPT
+            
+            st.markdown(current_analysis)
+            st.divider()
+            
+            st.subheader("Re-analyze Interview")
+            new_prompt = st.text_area("Update Prompt for Re-analysis", value=saved_prompt, height=150, key="reanalysis_prompt")
+            
+            if st.button("🔄 Re-analyze"):
+                if not validate_prompt(new_prompt):
+                    st.warning("Prompt cannot be empty.")
+                else:
+                    with st.spinner("Re-analyzing..."):
+                        try:
+                            new_analysis = run_analysis_logic(interview[2], new_prompt)
+                            db.update_analysis(interview[0], new_analysis, new_prompt)
+                            st.success("Analysis updated!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error during re-analysis: {e}")
             
         st.stop()
 
@@ -131,26 +170,18 @@ if st.button("✨ Analyze"):
             # st.text_area("Transcript", transcription_text, height=300) # Removed strictly to stick to flow, but keeping consistent with request
             
             # Save to DB
-            interview_id = db.save_transcription(uploaded_file.name, transcription_text)
+            interview_id = db.save_transcription(system_prompt, uploaded_file.name, transcription_text)
             
             # 2. Analyze using GPT
             st.subheader("Analysis")
-            with st.spinner("Analyzing from the interviewee's perspective..."):
-                chat_model = ChatOpenAI(model="gpt-4o", temperature=0.5)
-                
-                messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=f"Transcript:\n{transcription_text}")
-                ]
-                
-                analysis_response = chat_model.invoke(messages)
-                analysis_text = analysis_response.content
+            with st.spinner("Analyzing the interview..."):
+                analysis_text = run_analysis_logic(transcription_text, system_prompt)
                 
             st.success("Analysis complete!")
             
-            # Update DB with analysis
+            # Update DB with analysis and prompt
             if interview_id:
-                db.update_analysis(interview_id, analysis_text)
+                db.update_analysis(interview_id, analysis_text, system_prompt)
                 st.info("Results saved to database.")
                 st.session_state.selected_interview_id = interview_id
                 st.rerun()

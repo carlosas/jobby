@@ -11,11 +11,11 @@ class Database:
     def connect(self):
         try:
             self.conn = psycopg2.connect(
-                host=os.getenv("DB_HOST", "db"), # Defaulting to 'db' which is likely the service name in docker-compose
+                host=os.getenv("DB_HOST"),
+                port=os.getenv("DB_PORT"),
                 database=os.getenv("DB_NAME"),
                 user=os.getenv("DB_USER"),
                 password=os.getenv("DB_PASS"),
-                port=os.getenv("DB_PORT", "5432")
             )
         except Exception as e:
             print(f"Database connection failed: {e}")
@@ -29,6 +29,7 @@ class Database:
         CREATE TABLE IF NOT EXISTS interviews (
             id SERIAL PRIMARY KEY,
             audio_filename TEXT NOT NULL,
+            analysis_prompt TEXT,
             transcription TEXT,
             analysis TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -42,18 +43,18 @@ class Database:
             print(f"Error initializing DB: {e}")
             self.conn.rollback()
 
-    def save_transcription(self, filename, text):
+    def save_transcription(self, analysis_prompt, filename, text):
         if not self.conn:
             return None
         
         query = """
-        INSERT INTO interviews (audio_filename, transcription)
-        VALUES (%s, %s)
+        INSERT INTO interviews (analysis_prompt, audio_filename, transcription)
+        VALUES (%s, %s, %s)
         RETURNING id;
         """
         try:
             with self.conn.cursor() as cur:
-                cur.execute(query, (filename, text))
+                cur.execute(query, (analysis_prompt, filename, text))
                 interview_id = cur.fetchone()[0]
             self.conn.commit()
             return interview_id
@@ -62,18 +63,18 @@ class Database:
             self.conn.rollback()
             return None
 
-    def update_analysis(self, interview_id, analysis_text):
+    def update_analysis(self, interview_id, analysis_text, analysis_prompt=None):
         if not self.conn:
             return
         
         query = """
         UPDATE interviews
-        SET analysis = %s
+        SET analysis = %s, analysis_prompt = %s
         WHERE id = %s;
         """
         try:
             with self.conn.cursor() as cur:
-                cur.execute(query, (analysis_text, interview_id))
+                cur.execute(query, (analysis_text, analysis_prompt, interview_id))
             self.conn.commit()
         except Exception as e:
             print(f"Error updating analysis: {e}")
@@ -84,7 +85,13 @@ class Database:
         if not self.conn:
             return None
             
-        query = "SELECT * FROM interviews WHERE id = %s;"
+        # Explicitly select columns to ensure consistent indexing in main.py
+        # 0: id, 1: filename, 2: transcription, 3: analysis, 4: prompt, 5: created_at
+        query = """
+        SELECT id, audio_filename, transcription, analysis, analysis_prompt, created_at 
+        FROM interviews 
+        WHERE id = %s;
+        """
         try:
             with self.conn.cursor() as cur:
                 cur.execute(query, (interview_id,))
