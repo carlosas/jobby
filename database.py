@@ -79,6 +79,7 @@ class Database:
             print(f"Error updating analysis: {e}")
             self.conn.rollback()
 
+
     def get_interview(self, interview_id):
         if not self.conn:
             return None
@@ -91,3 +92,31 @@ class Database:
         except Exception as e:
             print(f"Error getting interview: {e}")
             return None
+
+    def get_all_interviews(self):
+        if not self.conn:
+            return []
+            
+        query = "SELECT id, audio_filename, created_at FROM interviews ORDER BY created_at DESC;"
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query)
+                return cur.fetchall()
+        except Exception as e:
+            print(f"Error getting all interviews: {e}")
+            return []
+
+    def delete_interview(self, interview_id):
+        if not self.conn:
+            return False
+            
+        query = "DELETE FROM interviews WHERE id = %s;"
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(query, (interview_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error deleting interview: {e}")
+            self.conn.rollback()
+            return False
