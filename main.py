@@ -16,7 +16,7 @@ if "selected_interview_id" not in st.session_state:
     st.session_state.selected_interview_id = None
 
 with st.sidebar:
-    if st.button("Start New Analysis", type="secondary"):
+    if st.button("➕ Start New Analysis", type="secondary"):
         st.session_state.selected_interview_id = None
         st.session_state.interview_selector = None
         st.rerun()
@@ -65,7 +65,7 @@ if st.session_state.selected_interview_id:
         
         with tab1:
             st.text_area("Full Transcription", interview[2], height=400)
-            if st.button("Delete Interview", type="primary"):
+            if st.button("🗑️ Delete Interview", type="primary"):
                 delete_dialog(st.session_state.selected_interview_id)
 
         with tab2:
@@ -106,7 +106,7 @@ system_prompt = st.text_area("Prompt", value=DEFAULT_ANALYSIS_PROMPT, height=150
 
 uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a", "mp4"])
 
-if st.button("Analyze", type="primary"):
+if st.button("✨ Analyze"):
     if uploaded_file is not None:
         # Save file temporarily
         file_path = f"temp_{uploaded_file.name}"
