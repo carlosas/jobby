@@ -6,22 +6,20 @@ import streamlit as st
 import os
 from database import Database
 
+st.set_page_config(page_title="Jobby", page_icon="🤖")
+st.title("🤖 Jobby")
+
 # Initialize Database
 db = Database()
-
-st.set_page_config(page_title="Interview Analyzer", page_icon="🎙️")
-st.title("🎙️ Interview Analyzer")
 
 if "selected_interview_id" not in st.session_state:
     st.session_state.selected_interview_id = None
 
 with st.sidebar:
-    if st.button("➕ Start New Analysis", type="secondary"):
+    if st.button("➕ New transcription", type="secondary"):
         st.session_state.selected_interview_id = None
         st.session_state.interview_selector = None
         st.rerun()
-    
-    st.markdown("---")
     
     interviews = db.get_all_interviews()
     if interviews:
@@ -60,6 +58,8 @@ def run_analysis_logic(transcription, system_prompt):
     ]
     response = chat_model.invoke(messages)
     return response.content
+
+to_delete = None
 
 if st.session_state.selected_interview_id:
     interview = db.get_interview(st.session_state.selected_interview_id)
