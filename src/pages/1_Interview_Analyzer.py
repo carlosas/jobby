@@ -1,11 +1,8 @@
-from services.llm_service import LLMService
 import streamlit as st
-import os
-from database import Database
-from auth import check_password
+from services.interview_orchestrator import InterviewOrchestrator
+from auth import require_auth
 
 st.set_page_config(page_title="Jobby", page_icon="🤖")
-
 
 # Hide sidebar if not logged in
 if not st.session_state.get("password_correct", False):
@@ -15,11 +12,11 @@ if not st.session_state.get("password_correct", False):
     </style>
     """, unsafe_allow_html=True)
 
-check_password()
+require_auth()
 st.title("🤖 Jobby")
 
-# Initialize Database
-db = Database()
+# Initialize Orchestrator
+orchestrator = InterviewOrchestrator()
 
 if "selected_interview_id" not in st.session_state:
     st.session_state.selected_interview_id = None
@@ -30,7 +27,7 @@ with st.sidebar:
         st.session_state.interview_selector = None
         st.rerun()
     
-    interviews = db.get_all_interviews()
+    interviews = orchestrator.get_all_interviews()
     if interviews:
         interview_map = {f"{i[1]} ({i[2]})": i[0] for i in interviews}
         
@@ -58,13 +55,10 @@ def validate_prompt(prompt):
         return False
     return True
 
-# Initialize LLM Service
-llm_service = LLMService()
-
 to_delete = None
 
 if st.session_state.selected_interview_id:
-    interview = db.get_interview(st.session_state.selected_interview_id)
+    interview = orchestrator.get_interview(st.session_state.selected_interview_id)
     if interview:
         st.info(f"Viewing analysis for: {interview[1]}")
         
@@ -72,7 +66,7 @@ if st.session_state.selected_interview_id:
         def delete_dialog(interview_id):
             st.warning("Are you sure you want to delete this interview? This action cannot be undone.")
             if st.button("Delete", type="primary"):
-                if db.delete_interview(interview_id):
+                if orchestrator.delete_interview(interview_id):
                     st.success("Interview deleted.")
                     st.session_state.selected_interview_id = None
                     st.session_state.interview_selector = None
@@ -105,8 +99,8 @@ if st.session_state.selected_interview_id:
                 else:
                     with st.spinner("Re-analyzing..."):
                         try:
-                            new_analysis = llm_service.analyze_interview(interview[2], new_prompt)
-                            db.update_analysis(interview[0], new_analysis, new_prompt)
+                            # We pass the transcript (interview[2]) to the orchestrator
+                            orchestrator.reanalyze_interview(interview[0], interview[2], new_prompt)
                             st.success("Analysis updated!")
                             st.rerun()
                         except Exception as e:
@@ -149,45 +143,25 @@ uploaded_file = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4
 
 if st.button("✨ Analyze"):
     if uploaded_file is not None:
-        # Save file temporarily
-        file_path = f"temp_{uploaded_file.name}"
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
         st.info(f"File '{uploaded_file.name}' uploaded successfully. Processing...")
         
         try:
-            # 1. Transcribe using OpenAI Whisper (via client)
-            st.subheader("Transcription")
-            with st.spinner("Transcribing..."):
-                transcription_text = llm_service.transcribe_audio(file_path)
+            st.subheader("Processing...")
+            with st.spinner("Transcribing and Analyzing (this may take a minute)..."):
+                # Delegate everything to orchestrator
+                # Note: getbuffer() returns a memoryview, which we can treat as bytes
+                interview_id = orchestrator.process_new_interview(
+                    uploaded_file.name, 
+                    uploaded_file.getbuffer(), 
+                    system_prompt
+                )
             
-            st.success("Transcription complete!")
-            # st.text_area("Transcript", transcription_text, height=300) # Removed strictly to stick to flow, but keeping consistent with request
-            
-            # Save to DB
-            interview_id = db.save_transcription(system_prompt, uploaded_file.name, transcription_text)
-            
-            # 2. Analyze using GPT
-            st.subheader("Analysis")
-            with st.spinner("Analyzing the interview..."):
-                analysis_text = llm_service.analyze_interview(transcription_text, system_prompt)
-                
-            st.success("Analysis complete!")
-            
-            # Update DB with analysis and prompt
-            if interview_id:
-                db.update_analysis(interview_id, analysis_text, system_prompt)
-                st.info("Results saved to database.")
-                st.session_state.selected_interview_id = interview_id
-                st.rerun()
+            st.success("Processing complete!")
+            st.info("Results saved to database.")
+            st.session_state.selected_interview_id = interview_id
+            st.rerun()
                 
         except Exception as e:
             st.error(f"An error occurred: {e}")
-            
-        finally:
-            # Cleanup
-            if os.path.exists(file_path):
-                os.remove(file_path)
     else:
         st.warning("Please upload a file first.")
