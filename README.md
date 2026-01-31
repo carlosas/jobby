@@ -1,5 +1,7 @@
 # Jobby
 
+<img src="assets/logo.png" align="right" width="100" alt="Jobby Logo">
+
 > 🚧 **WORK IN PROGRESS** 🚧
 
 Jobby is a tiny application designed to help you analyze and improve your job interview performance. It leverages AI to transcribe and analyze your interview recordings, providing actionable feedback.
