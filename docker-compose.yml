@@ -14,7 +14,7 @@ services:
       - DB_PORT=${DB_PORT}
     depends_on:
       - db
-    command: streamlit run Home.py --server.port=8501 --server.address=0.0.0.0
+    command: streamlit run src/Home.py --server.port=8501 --server.address=0.0.0.0
 
   db:
     image: postgres:15

@@ -1,7 +1,4 @@
-from langchain_openai import ChatOpenAI
-from openai import OpenAI
-
-from langchain.schema import SystemMessage, HumanMessage
+from services.llm_service import LLMService
 import streamlit as st
 import os
 from database import Database
@@ -49,15 +46,8 @@ def validate_prompt(prompt):
         return False
     return True
 
-# Helper to run analysis
-def run_analysis_logic(transcription, system_prompt):
-    chat_model = ChatOpenAI(model="gpt-4o", temperature=0.5)
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=f"Transcript:\n{transcription}")
-    ]
-    response = chat_model.invoke(messages)
-    return response.content
+# Initialize LLM Service
+llm_service = LLMService()
 
 to_delete = None
 
@@ -103,7 +93,7 @@ if st.session_state.selected_interview_id:
                 else:
                     with st.spinner("Re-analyzing..."):
                         try:
-                            new_analysis = run_analysis_logic(interview[2], new_prompt)
+                            new_analysis = llm_service.analyze_interview(interview[2], new_prompt)
                             db.update_analysis(interview[0], new_analysis, new_prompt)
                             st.success("Analysis updated!")
                             st.rerun()
@@ -158,13 +148,7 @@ if st.button("✨ Analyze"):
             # 1. Transcribe using OpenAI Whisper (via client)
             st.subheader("Transcription")
             with st.spinner("Transcribing..."):
-                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                with open(file_path, "rb") as audio_file:
-                    transcription_response = client.audio.transcriptions.create(
-                        model="whisper-1", 
-                        file=audio_file
-                    )
-                transcription_text = transcription_response.text
+                transcription_text = llm_service.transcribe_audio(file_path)
             
             st.success("Transcription complete!")
             # st.text_area("Transcript", transcription_text, height=300) # Removed strictly to stick to flow, but keeping consistent with request
@@ -175,7 +159,7 @@ if st.button("✨ Analyze"):
             # 2. Analyze using GPT
             st.subheader("Analysis")
             with st.spinner("Analyzing the interview..."):
-                analysis_text = run_analysis_logic(transcription_text, system_prompt)
+                analysis_text = llm_service.analyze_interview(transcription_text, system_prompt)
                 
             st.success("Analysis complete!")
             
