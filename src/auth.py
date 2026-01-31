@@ -54,11 +54,7 @@ def check_password():
         st.stop()
         return False
 
-    st.markdown("""
-    <style>
-        [data-testid="stSidebarNav"] {display: none;}
-    </style>
-    """, unsafe_allow_html=True)
+
 
     st.header("Login Request")
     

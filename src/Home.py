@@ -6,6 +6,15 @@ st.set_page_config(
     page_icon="🤖",
 )
 
+
+# Hide sidebar if not logged in (Separation of Concerns: UI logic here, Auth logic in check_password)
+if not st.session_state.get("password_correct", False):
+    st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {display: none;}
+    </style>
+    """, unsafe_allow_html=True)
+
 check_password()
 
 st.title("Welcome to Jobby 🤖")

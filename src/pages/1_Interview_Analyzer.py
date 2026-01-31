@@ -6,6 +6,15 @@ from auth import check_password
 
 st.set_page_config(page_title="Jobby", page_icon="🤖")
 
+
+# Hide sidebar if not logged in
+if not st.session_state.get("password_correct", False):
+    st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {display: none;}
+    </style>
+    """, unsafe_allow_html=True)
+
 check_password()
 st.title("🤖 Jobby")
 
