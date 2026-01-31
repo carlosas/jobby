@@ -2,8 +2,11 @@ from services.llm_service import LLMService
 import streamlit as st
 import os
 from database import Database
+from auth import check_password
 
 st.set_page_config(page_title="Jobby", page_icon="🤖")
+
+check_password()
 st.title("🤖 Jobby")
 
 # Initialize Database
